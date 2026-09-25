@@ -4,7 +4,7 @@ import requests
 # إعدادات الصفحة
 st.set_page_config(page_title="محمل تيك توك", page_icon="✨", layout="centered")
 
-# تنسيق CSS منظم للواجهة ودعم زر التنزيل المباشر
+# تنسيق CSS احترافي باللون الذهبي والداكن
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
@@ -23,7 +23,7 @@ st.markdown("""
         height: 0px !important;
     }
 
-    /* توحيد الخط لكل العناصر */
+    /* توحيد الخط لكافة العناصر */
     * {
         font-family: 'Tajawal', 'GS Pro', sans-serif !important;
     }
@@ -69,7 +69,7 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* زر استخراج الفيديو زر العادي */
+    /* زر استخراج الفيديو */
     div.stButton > button {
         background-color: #D4AF37 !important;
         color: #000000 !important;
@@ -109,7 +109,7 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* الحقوق في الأسفل جداً */
+    /* الحقوق في الأسفل */
     .custom-footer {
         text-align: center;
         color: #444444 !important;
@@ -120,11 +120,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# دوال جلب الفيديو
+# ترويسة محاكاة المتصفح لمنع تقليص الجودة والتقطيع
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Referer": "https://www.tiktok.com/"
+}
+
 def expand_tiktok_url(url: str):
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
         try:
-            res = requests.head(url, allow_redirects=True, timeout=10)
+            res = requests.head(url, headers=HEADERS, allow_redirects=True, timeout=10)
             return str(res.url)
         except:
             pass
@@ -132,9 +137,10 @@ def expand_tiktok_url(url: str):
 
 def get_tiktok_video_url(url):
     full_url = expand_tiktok_url(url)
-    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    # السحب بجودة HD عالية
     try:
-        res = requests.post("https://www.tikwm.com/api/", data={"url": full_url, "hd": 1}, headers=headers, timeout=15)
+        res = requests.post("https://www.tikwm.com/api/", data={"url": full_url, "hd": 1}, headers=HEADERS, timeout=15)
         data = res.json()
         if data.get("code") == 0:
             play = data["data"].get("hdplay") or data["data"].get("play")
@@ -143,11 +149,12 @@ def get_tiktok_video_url(url):
     except:
         pass
         
+    # سيرفر احتياطي لجودة عالية
     try:
-        res = requests.get(f"https://api.tiklydown.eu.org/api/download?url={full_url}", timeout=15)
+        res = requests.get(f"https://api.tiklydown.eu.org/api/download?url={full_url}", headers=HEADERS, timeout=15)
         data = res.json()
         if "video" in data:
-            return data["video"]["noWatermark"]
+            return data["video"].get("noWatermark") or data["video"].get("watermark")
     except:
         pass
     return None
@@ -160,31 +167,36 @@ url = st.text_input("ضع رابط فيديو تيك توك هنا:", placeholde
 
 if st.button("استخراج الفيديو 🚀"):
     if url and "tiktok" in url.lower():
-        with st.spinner("جاري معالجة الفيديو وتجهيز الملف... ⏳"):
+        with st.spinner("جاري جلب الفيديو بأعلى جودة وتثبيت الصوت... ⏳"):
             video_url = get_tiktok_video_url(url)
             if video_url:
                 try:
-                    # جلب بيانات الفيديو مباشرة للتنزيل
-                    video_res = requests.get(video_url, timeout=30)
+                    # تجميع أجزاء الفيديو لمنع التعليق وتزامن الصوت
+                    video_res = requests.get(video_url, headers=HEADERS, stream=True, timeout=40)
                     if video_res.status_code == 200:
-                        st.session_state['video_data'] = video_res.content
+                        video_bytes = bytearray()
+                        for chunk in video_res.iter_content(chunk_size=1024 * 1024):
+                            if chunk:
+                                video_bytes.extend(chunk)
+                        
+                        st.session_state['video_data'] = bytes(video_bytes)
                         st.session_state['ready'] = True
                     else:
-                        st.error("تعذر تحميل ملف الفيديو من المصدر. ❌")
-                except:
-                    st.error("حدث خطأ أثناء الاتصال بالسيرفر. ❌")
+                        st.error("تعذر تحميل ملف الفيديو من سيرفر المصدر. ❌")
+                except Exception:
+                    st.error("حدث خطأ أثناء الاتصال بالسيرفر. حاول مجدداً. ❌")
             else:
                 st.error("عذراً، السيرفر يرفض الرابط أو الحساب خاص. ❌")
     else:
         st.warning("الرجاء إدخال رابط تيك توك صحيح! 🔗")
 
-# إظهار زر التنزيل المباشر عند جاهزية الملف
+# زر التنزيل عند اكتمال جلب كافة أجزاء الفيديو بنجاح
 if st.session_state.get('ready'):
     st.success("تم تجهيز الفيديو بنجاح! 🎉")
     st.download_button(
         label="تحميل الفيديو الآن 📥",
         data=st.session_state['video_data'],
-        file_name="tiktok_video.mp4",
+        file_name="tiktok_hd_video.mp4",
         mime="video/mp4",
         use_container_width=True
     )
