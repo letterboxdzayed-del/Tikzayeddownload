@@ -1,4 +1,5 @@
 import streamlit as st
+import yt_dlp
 import requests
 import tempfile
 import os
@@ -35,51 +36,37 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def fetch_tiktok_urls(url):
-    """جلب الروابط عبر سيرفرين لضمان أفضل جودة وفريمات"""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+def download_raw_video(url):
+    """سحب الفيديو الخام مباشرة من السيرفرات الرسمية بدون ضغط"""
+    temp_dir = tempfile.gettempdir()
+    v_path = os.path.join(temp_dir, f"video_raw_{os.urandom(4).hex()}.mp4")
+    
+    ydl_opts = {
+        'format': 'best',
+        'outtmpl': v_path,
+        'quiet': True,
+        'no_warnings': True,
     }
     
-    # المحاولة الأولى: سيرفر TiklyDown (يحافظ غالباً على 60fps)
     try:
-        res1 = requests.get(f"https://api.tiklydown.eu.org/api/download?url={url}", headers=headers, timeout=15).json()
-        if "video" in res1 and "noWatermark" in res1["video"]:
-            return res1["video"]["noWatermark"], res1.get("music", {}).get("play_url")
-    except:
-        pass
-        
-    # المحاولة الثانية: سيرفر TikWM (احتياطي)
-    try:
-        res2 = requests.post("https://www.tikwm.com/api/", data={"url": url, "hd": 1}, headers=headers, timeout=15).json()
-        if res2.get("code") == 0:
-            v_url = res2["data"].get("hdplay") or res2["data"].get("play")
-            return v_url, res2["data"].get("music")
-    except:
-        pass
-        
-    return None, None
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        return v_path
+    except Exception as e:
+        return None
 
-def download_to_temp(url, is_video=True):
-    """تحميل الملف وحفظه في مسار مؤقت لضمان عدم تلف الفريمات"""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/114.0.0.0 Safari/537.36",
-        "Accept": "*/*",
-        "Connection": "keep-alive"
-    }
-    response = requests.get(url, headers=headers, stream=True, timeout=60)
-    
-    if is_video:
-        suffix = ".mp4"
-    else:
-        suffix = ".mp3"
-        
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    for chunk in response.iter_content(chunk_size=1024 * 1024):
-        if chunk:
-            temp_file.write(chunk)
-    temp_file.close()
-    return temp_file.name
+def fetch_audio_fallback(url):
+    """جلب الصوت كملف منفصل"""
+    try:
+        res = requests.post("https://www.tikwm.com/api/", data={"url": url, "hd": 1}, timeout=15).json()
+        if res.get("code") == 0 and res["data"].get("music"):
+            m_url = res["data"]["music"]
+            m_res = requests.get(m_url, timeout=30)
+            if m_res.status_code == 200:
+                return m_res.content
+    except:
+        pass
+    return None
 
 st.markdown('<div class="title-text">🔥 محمل زايد (الصوت والفيديو الأصلي)</div>', unsafe_allow_html=True)
 
@@ -87,34 +74,27 @@ url_input = st.text_input("ضع رابط الفيديو هنا:", placeholder="h
 
 if st.button("استخراج الملفات 🚀"):
     if url_input:
-        with st.spinner("جاري سحب الجودة الأصلية بكامل الفريمات... ⏳"):
+        with st.spinner("جاري الاتصال بسيرفرات تيك توك وسحب الملف الخام (قد يستغرق بعض الوقت بناءً على حجم الفيديو)... ⏳"):
             st.session_state['v_path'] = None
-            st.session_state['m_path'] = None
+            st.session_state['m_bytes'] = None
             st.session_state['ready'] = False
             
-            v_url, m_url = fetch_tiktok_urls(url_input)
+            # سحب الفيديو الخام
+            v_path = download_raw_video(url_input)
             
-            if v_url:
-                try:
-                    # سحب الفيديو
-                    st.session_state['v_path'] = download_to_temp(v_url, is_video=True)
-                    
-                    # التحقق من حجم الفيديو
-                    file_size = os.path.getsize(st.session_state['v_path'])
-                    if file_size < 2000000:
-                        st.warning("⚠️ الفيديو مسحوب بحجم صغير، السيرفرات حالياً تطبق ضغطاً إجبارياً على هذا المقطع.")
-                    else:
-                        st.success("✅ تم سحب الملفات بنجاح بكامل الفريمات وبدون تقطيع!")
-                        
-                    # سحب الصوت
-                    if m_url:
-                        st.session_state['m_path'] = download_to_temp(m_url, is_video=False)
-                            
-                    st.session_state['ready'] = True
-                except Exception as e:
-                    st.error("حدث خطأ أثناء تحميل البيانات، جرب مرة ثانية.")
+            if v_path and os.path.exists(v_path):
+                st.session_state['v_path'] = v_path
+                
+                # سحب الصوت
+                st.session_state['m_bytes'] = fetch_audio_fallback(url_input)
+                
+                st.session_state['ready'] = True
+                
+                # التحقق من الحجم لضمان النتيجة
+                file_size_mb = os.path.getsize(v_path) / (1024 * 1024)
+                st.success(f"✅ تم سحب الملف الأصلي بنجاح! (حجم الملف الحقيقي: {file_size_mb:.2f} MB)")
             else:
-                st.error("❌ تأكد من الرابط أو أن الحساب عام.")
+                st.error("❌ حدث خطأ أثناء سحب الملف الخام، يرجى التأكد من الرابط.")
     else:
         st.warning("الرجاء إدخال الرابط.")
 
@@ -128,18 +108,17 @@ if st.session_state.get('ready'):
                 st.download_button(
                     label="تحميل الفيديو 🎬 (MP4)",
                     data=file,
-                    file_name="Video_Raw_HD.mp4",
+                    file_name="Zayed_Raw_HD.mp4",
                     mime="video/mp4",
                     use_container_width=True
                 )
             
     with col2:
-        if st.session_state.get('m_path') and os.path.exists(st.session_state['m_path']):
-            with open(st.session_state['m_path'], "rb") as file:
-                st.download_button(
-                    label="تحميل الصوت 🎵 (MP3)",
-                    data=file,
-                    file_name="Audio_Original.mp3",
-                    mime="audio/mpeg",
-                    use_container_width=True
-                )
+        if st.session_state.get('m_bytes'):
+            st.download_button(
+                label="تحميل الصوت 🎵 (MP3)",
+                data=st.session_state['m_bytes'],
+                file_name="Audio_Original.mp3",
+                mime="audio/mpeg",
+                use_container_width=True
+            )
