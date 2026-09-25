@@ -5,7 +5,7 @@ import io
 # إعدادات الصفحة
 st.set_page_config(page_title="محمل تيك توك الاحترافي HD", page_icon="✨", layout="centered")
 
-# CSS وتصميم الواجهة
+# CSS لتصميم واجهة أنيقة باللون الذهبي والأسود
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
@@ -18,17 +18,17 @@ st.markdown("""
     .title-text {
         color: #D4AF37 !important;
         text-align: center;
-        font-size: 34px !important;
+        font-size: 32px !important;
         font-weight: 700 !important;
-        margin-top: 10px;
+        margin-top: 15px;
         margin-bottom: 5px;
-        text-shadow: 0 0 12px rgba(212, 175, 55, 0.2);
+        text-shadow: 0 0 12px rgba(212, 175, 55, 0.25);
     }
     .subtitle-text {
-        color: #a0a0a0 !important;
+        color: #aaaaaa !important;
         text-align: center;
-        font-size: 15px !important;
-        margin-bottom: 30px;
+        font-size: 14px !important;
+        margin-bottom: 25px;
     }
     div[data-baseweb="input"] {
         background-color: #141414 !important;
@@ -37,11 +37,11 @@ st.markdown("""
     }
     div[data-baseweb="input"]:focus-within {
         border-color: #D4AF37 !important;
-        box-shadow: 0 0 10px rgba(212, 175, 55, 0.2) !important;
+        box-shadow: 0 0 10px rgba(212, 175, 55, 0.3) !important;
     }
     input { color: #ffffff !important; background-color: transparent !important; }
 
-    /* زر الاستخراج */
+    /* زر الاستخراج الرئيسي */
     div.stButton > button {
         background-color: #D4AF37 !important;
         color: #000000 !important;
@@ -60,66 +60,56 @@ st.markdown("""
         transform: translateY(-2px) !important;
     }
 
-    /* أزرار التحميل */
+    /* أزرار التحميل المباشرة */
     div.stDownloadButton > button {
         border: none !important;
         border-radius: 12px !important;
         font-size: 17px !important;
         font-weight: 700 !important;
-        padding: 12px 15px !important;
+        padding: 14px 15px !important;
         width: 100% !important;
         transition: all 0.3s ease !important;
         margin-top: 10px !important;
     }
     
+    /* زر MP4 */
     div[data-testid="column"]:nth-child(1) div.stDownloadButton > button {
         background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%) !important;
         color: #000000 !important;
-        box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25) !important;
+        box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3) !important;
     }
 
+    /* زر MP3 */
     div[data-testid="column"]:nth-child(2) div.stDownloadButton > button {
-        background: #1f1f1f !important;
+        background: #1c1c1c !important;
         color: #D4AF37 !important;
         border: 1px solid #D4AF37 !important;
     }
 
-    .direct-link-btn {
-        display: block;
-        text-align: center;
-        background-color: #161616;
-        color: #D4AF37 !important;
-        border: 1px dashed #D4AF37;
-        padding: 10px;
-        border-radius: 10px;
-        text-decoration: none;
-        font-weight: bold;
-        margin-top: 15px;
-    }
-
     .custom-footer {
         text-align: center;
-        color: #444444 !important;
+        color: #555555 !important;
         font-size: 13px !important;
-        margin-top: 60px;
+        margin-top: 50px;
         margin-bottom: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# إعداد جلسة الاتصال بالسيرفرات
 session = requests.Session()
 session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
 })
 
-def get_tiktok_hd_media(url):
-    """جلب رابط HD الأصلي بأعلى Bitrate متاح بدون ضغط"""
+def fetch_tiktok_original_sources(url):
+    """جلب روابط الفيديو والصوت الأصلية بأعلى بت ريت (Bitrate) متوفر"""
     try:
         res = session.post("https://www.tikwm.com/api/", data={"url": url, "hd": 1}, timeout=15)
         data = res.json()
         if data.get("code") == 0:
             d = data["data"]
-            # تقديم رابط hdplay المباشر أعلى جودة متوفرة
+            # أخذ رابط HD المباشر الخالي من العلامة المائية
             v_url = d.get("hdplay") or d.get("play")
             if v_url and v_url.startswith("/"):
                 v_url = f"https://www.tikwm.com{v_url}"
@@ -130,7 +120,7 @@ def get_tiktok_hd_media(url):
     except:
         pass
 
-    # المحاولة الاحتياطية لجودة HD عبر API سريعة أخرى
+    # سيرفر احترافي بديل في حال استجابة أبطأ
     try:
         res = session.get(f"https://api.tiklydown.eu.org/api/download?url={url}", timeout=15)
         if res.status_code == 200:
@@ -143,12 +133,12 @@ def get_tiktok_hd_media(url):
 
     return None, None
 
-def download_stream_bytes(download_url):
-    """تحميل الفيديو بنظام التدفق (Chunking) لمنع تقطيع أو ضياع الفريمات"""
-    if not download_url:
+def download_file_bytes(file_url):
+    """تجمييع حزم البيانات كاملة لضمان ضبط الفريمات ومنع التعليق أو تباطؤ الصوت/الفيديو"""
+    if not file_url:
         return None
     try:
-        with session.get(download_url, stream=True, timeout=30) as r:
+        with session.get(file_url, stream=True, timeout=30) as r:
             if r.status_code == 200:
                 buffer = io.BytesIO()
                 for chunk in r.iter_content(chunk_size=1024 * 1024):  # 1MB Chunks
@@ -159,44 +149,44 @@ def download_stream_bytes(download_url):
         pass
     return None
 
-# الواجهة الرئيسية
+# واجهة المستخدم
 st.markdown('<div class="title-text">✨ محمل تيك توك الاحترافي HD</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle-text">سحب مباشر بدقة 1080p كاملة بدون تقطيع أو ضغط للمونتاج</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle-text">تحميل الصوت والفيديو بأعلى جودة وفريمات أصلية بدون تقطيع</div>', unsafe_allow_html=True)
 
-url = st.text_input("ضع رابط فيديو تيك توك هنا:", placeholder="https://vm.tiktok.com/...")
+url_input = st.text_input("ضع رابط فيديو تيك توك هنا:", placeholder="https://vm.tiktok.com/...")
 
-if st.button("استخراج الفيديو والصوت بأعلى جودة 🚀"):
-    if url and "tiktok" in url.lower():
-        with st.spinner("جاري جلب أعلى جودة HD وتجميع البتات بدون فقدان فريمات... ⏳"):
-            v_url, m_url = get_tiktok_hd_media(url)
+if st.button("استخراج الملفات 🚀"):
+    if url_input and "tiktok" in url_input.lower():
+        with st.spinner("جاري استخراج الملف الأصلي بأعلى دقة ومزامنة... ⏳"):
+            v_url, m_url = fetch_tiktok_original_sources(url_input)
             
             if v_url:
-                v_bytes = download_stream_bytes(v_url)
-                m_bytes = download_stream_bytes(m_url) if m_url else None
+                v_bytes = download_file_bytes(v_url)
+                m_bytes = download_file_bytes(m_url) if m_url else None
                 
                 if v_bytes:
                     st.session_state['v_bytes'] = v_bytes
                     st.session_state['m_bytes'] = m_bytes
-                    st.session_state['v_url'] = v_url
                     st.session_state['ready'] = True
                 else:
-                    st.error("حدث خطأ أثناء تجميع ملف الـ HD، حاول مجدداً.")
+                    st.error("تعذر تحميل ملف الفيديو، حاول مرة أخرى.")
             else:
-                st.error("تعذر الوصول لملف الفيديو المباشر. تأكد من أن الحساب عام.")
+                st.error("تعذر الوصول لرابط الفيديو. تأكد أن الحساب عام وليس خاصاً.")
     else:
-        st.warning("الرجاء إدخال رابط تيك توك صحيح! 🔗")
+        st.warning("يرجى إدخال رابط تيك توك صحيح! 🔗")
 
+# عرض أزرار التحميل فور الجاهزية (كبسة واحدة لكل ملف)
 if st.session_state.get('ready'):
-    st.success("تم سحب ملف الـ HD الأصلي بنجاح 100%! 🎉")
+    st.success("تم تجهيز الملفات بأعلى دقة أصلية 100%! 🎉")
     
     col1, col2 = st.columns(2)
     
     with col1:
         if st.session_state.get('v_bytes'):
             st.download_button(
-                label="تحميل الفيديو HD (MP4) 🎬",
+                label="تحميل الفيديو (MP4) 🎬",
                 data=st.session_state['v_bytes'],
-                file_name="tiktok_hd_1080p.mp4",
+                file_name="TikTok_HD_Video.mp4",
                 mime="video/mp4",
                 use_container_width=True
             )
@@ -206,13 +196,9 @@ if st.session_state.get('ready'):
             st.download_button(
                 label="تحميل الصوت (MP3) 🎵",
                 data=st.session_state['m_bytes'],
-                file_name="tiktok_audio.mp3",
+                file_name="TikTok_Audio.mp3",
                 mime="audio/mpeg",
                 use_container_width=True
             )
-
-    # رابط مباشر إضافي للتحميل الفوري بدون المرور بذاكرة المتصفح
-    if st.session_state.get('v_url'):
-        st.markdown(f'<a href="{st.session_state["v_url"]}" target="_blank" class="direct-link-btn">🔗 رابط تحميل HD مباشر (سريع للمونتاج)</a>', unsafe_allow_html=True)
 
 st.markdown('<div class="custom-footer">إنشاء زايد</div>', unsafe_allow_html=True)
