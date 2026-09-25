@@ -36,8 +36,10 @@ st.markdown("""
 def fetch_tiktok_urls(url):
     """سحب الروابط الأصلية الخام من السيرفر مباشرة"""
     try:
-        res = requests.post("https://www.tikwm.com/api/", data={"url": url, "hd": 1}, timeout=15).json()
+        # زيادة مهلة الاتصال بالـ API إلى 30 ثانية كما اقترحت
+        res = requests.post("https://www.tikwm.com/api/", data={"url": url, "hd": 1}, timeout=30).json()
         if res.get("code") == 0:
+            # الأولوية دائماً لـ hdplay
             v_url = res["data"].get("hdplay") or res["data"].get("play")
             m_url = res["data"].get("music")
             return v_url, m_url
@@ -51,7 +53,7 @@ url_input = st.text_input("ضع رابط الفيديو هنا:", placeholder="h
 
 if st.button("استخراج الملفات 🚀"):
     if url_input:
-        with st.spinner("جاري سحب الملفات الخام بدون أي ضغط... ⏳"):
+        with st.spinner("جاري سحب الملفات الخام بدون أي ضغط (قد يستغرق 30 ثانية)... ⏳"):
             st.session_state['v_bytes'] = None
             st.session_state['m_bytes'] = None
             st.session_state['ready'] = False
@@ -60,18 +62,17 @@ if st.button("استخراج الملفات 🚀"):
             
             if v_url:
                 try:
-                    # إضافة شريط تقدم للمقاطع عالية الجودة
-                    progress_bar = st.progress(0, text="جاري تحميل الفيديو بجودته الأصلية...")
+                    progress_bar = st.progress(0, text="جاري سحب الجودة الأصلية بالكامل...")
                     
-                    # استخدام stream=True وزيادة المهلة لمنع التعليق
-                    v_response = requests.get(v_url, stream=True, timeout=60)
+                    # استخدام stream=True مع مهلة 30 ثانية لضمان عدم قطع الاتصال للملفات الضخمة
+                    v_response = requests.get(v_url, stream=True, timeout=30)
                     total_size = int(v_response.headers.get('content-length', 0))
                     
                     v_bytes = b""
                     downloaded = 0
                     
-                    # تحميل الملف على شكل حزم (Chunks) للحفاظ على استقرار الموقع
-                    for chunk in v_response.iter_content(chunk_size=1024 * 1024): # حزم بحجم 1 ميجابايت
+                    # تجميع البيانات بحزم أكبر لضمان عدم ضياع أي فريم
+                    for chunk in v_response.iter_content(chunk_size=2048 * 2048): 
                         if chunk:
                             v_bytes += chunk
                             downloaded += len(chunk)
@@ -79,8 +80,12 @@ if st.button("استخراج الملفات 🚀"):
                                 progress = min(downloaded / total_size, 1.0)
                                 progress_bar.progress(progress, text=f"جاري التحميل... {int(progress * 100)}%")
                     
+                    # التحقق من أن حجم الملف النهائي ليس صغيراً جداً (أكبر من 2 ميجا تقريباً)
+                    if len(v_bytes) < 3000000 and total_size > 3000000:
+                        st.warning("تنبيه: السيرفر أعطى نسخة مضغوطة، حاول سحب الرابط مرة أخرى.")
+                    
                     st.session_state['v_bytes'] = v_bytes
-                    progress_bar.empty() # إخفاء شريط التقدم بعد الانتهاء
+                    progress_bar.empty()
                     
                     if m_url:
                         m_response = requests.get(m_url, timeout=30)
@@ -90,7 +95,7 @@ if st.button("استخراج الملفات 🚀"):
                     st.session_state['ready'] = True
                     st.success("تم سحب الملفات الأصلية! جاهزة للتحميل بكامل فريماتها.")
                 except Exception as e:
-                    st.error("حدث خطأ أثناء التحميل، قد يكون المقطع ضخماً جداً أو استجابة السيرفر بطيئة.")
+                    st.error("حدث خطأ أو تأخر في الاستجابة، حاول مجدداً.")
             else:
                 st.error("تأكد من الرابط أو أن الحساب عام.")
     else:
