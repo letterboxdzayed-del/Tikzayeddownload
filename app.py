@@ -52,7 +52,6 @@ url_input = st.text_input("ضع رابط الفيديو هنا:", placeholder="h
 if st.button("استخراج الملفات 🚀"):
     if url_input:
         with st.spinner("جاري سحب الملفات الخام بدون أي ضغط... ⏳"):
-            # تصفير الجلسة القديمة
             st.session_state['v_bytes'] = None
             st.session_state['m_bytes'] = None
             st.session_state['ready'] = False
@@ -61,20 +60,37 @@ if st.button("استخراج الملفات 🚀"):
             
             if v_url:
                 try:
-                    # تحميل بايتات الفيديو بالكامل لضمان عدم التقطيع أثناء الحفظ
-                    v_response = requests.get(v_url, timeout=20)
-                    if v_response.status_code == 200:
-                        st.session_state['v_bytes'] = v_response.content
+                    # إضافة شريط تقدم للمقاطع عالية الجودة
+                    progress_bar = st.progress(0, text="جاري تحميل الفيديو بجودته الأصلية...")
+                    
+                    # استخدام stream=True وزيادة المهلة لمنع التعليق
+                    v_response = requests.get(v_url, stream=True, timeout=60)
+                    total_size = int(v_response.headers.get('content-length', 0))
+                    
+                    v_bytes = b""
+                    downloaded = 0
+                    
+                    # تحميل الملف على شكل حزم (Chunks) للحفاظ على استقرار الموقع
+                    for chunk in v_response.iter_content(chunk_size=1024 * 1024): # حزم بحجم 1 ميجابايت
+                        if chunk:
+                            v_bytes += chunk
+                            downloaded += len(chunk)
+                            if total_size > 0:
+                                progress = min(downloaded / total_size, 1.0)
+                                progress_bar.progress(progress, text=f"جاري التحميل... {int(progress * 100)}%")
+                    
+                    st.session_state['v_bytes'] = v_bytes
+                    progress_bar.empty() # إخفاء شريط التقدم بعد الانتهاء
                     
                     if m_url:
-                        m_response = requests.get(m_url, timeout=20)
+                        m_response = requests.get(m_url, timeout=30)
                         if m_response.status_code == 200:
                             st.session_state['m_bytes'] = m_response.content
                             
                     st.session_state['ready'] = True
                     st.success("تم سحب الملفات الأصلية! جاهزة للتحميل بكامل فريماتها.")
                 except Exception as e:
-                    st.error("حدث خطأ أثناء تحميل حزم البيانات، حاول مجدداً.")
+                    st.error("حدث خطأ أثناء التحميل، قد يكون المقطع ضخماً جداً أو استجابة السيرفر بطيئة.")
             else:
                 st.error("تأكد من الرابط أو أن الحساب عام.")
     else:
