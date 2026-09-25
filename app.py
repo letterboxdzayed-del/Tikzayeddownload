@@ -1,33 +1,33 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="تنزيل تيك توك HD", page_icon="🔥")
+# إعدادات الصفحة الأساسية
+st.set_page_config(page_title="أداة تنزيل المقاطع", page_icon="📥")
 
-st.title("سحب فيديوهات التيك توك بأعلى جودة خاوة 🦅")
-url = st.text_input("انسخ رابط الفيديو هون:")
+st.title("أداة تنزيل مقاطع الفيديو بجودة أصلية")
+url = st.text_input("الرجاء إدخال رابط المقطع هنا:")
 
-if st.button("تنزيل الفيديو"):
+if st.button("بدء التنزيل"):
     if url:
-        with st.spinner("جاري سحب الجودة الأصلية..."):
-            # استخدام API لجلب جودة HD المخفية
+        with st.spinner("جاري استخراج المقطع..."):
             api_url = f"https://www.tikwm.com/api/?url={url}&hd=1"
             try:
                 response = requests.get(api_url).json()
                 if response.get('code') == 0:
-                    # سحب رابط HD إذا توفر، أو الرابط العادي كبديل
-                    hd_link = response['data'].get('hdplay') or response['data'].get('play')
-                    st.success("تم السحب خاوة!")
+                    video_data = response.get('data', {})
+                    hd_link = video_data.get('hdplay') or video_data.get('play')
                     
-                    # عرض الفيديو 
-                    st.video(hd_link)
+                    st.success("تم استخراج الرابط بنجاح.")
                     
-                    # زر للتحميل
+                    # زر تحميل مباشر بتصميم احترافي ورسمي
                     st.markdown(f"""
-                    <a href="{hd_link}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #ff0050; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">اضغط هنا لتحميل الفيديو</a>
+                    <a href="{hd_link}" target="_blank" style="display: block; width: 100%; text-align: center; padding: 12px; background-color: #0056b3; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-family: Arial, sans-serif;">
+                        اضغط هنا لتحميل المقطع
+                    </a>
                     """, unsafe_allow_html=True)
                 else:
-                    st.error("تأكد من الرابط أو إن الفيديو مش خاص (Private).")
+                    st.error("تعذر العثور على المقطع. يرجى التأكد من صحة الرابط وأن الحساب ليس خاصاً.")
             except Exception as e:
-                st.error("صار خطأ بالاتصال، جرب كمان مرة.")
+                st.error("حدث خطأ في الاتصال بالخادم. يرجى المحاولة مرة أخرى.")
     else:
-        st.warning("حط الرابط أول يا غالي!")
+        st.warning("يرجى إدخال الرابط أولاً قبل الضغط على زر التنزيل.")
