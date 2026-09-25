@@ -1,5 +1,4 @@
 import streamlit as st
-import yt_dlp
 import requests
 
 # إعدادات الصفحة
@@ -44,10 +43,7 @@ st.markdown("""
         border-color: #D4AF37 !important;
         box-shadow: 0 0 10px rgba(212, 175, 55, 0.2) !important;
     }
-    input {
-        color: #ffffff !important;
-        background-color: transparent !important;
-    }
+    input { color: #ffffff !important; background-color: transparent !important; }
 
     /* زر الاستخراج */
     div.stButton > button {
@@ -102,81 +98,100 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Referer": "https://www.tiktok.com/"
-}
+# جلسة متصفح وهمية لتجاوز الحظر
+session = requests.Session()
+session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+})
 
-def extract_original_tiktok(tiktok_url):
-    """استخراج رابط الفيديو والصوت المباشر من سيرفرات تيك توك الرسمية مباشرة"""
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'format': 'bestvideo+bestaudio/best',
-        'check_formats': False,
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(tiktok_url, download=False)
-        video_direct_url = info.get('url')
-        
-        # البحث عن ملف الصوت المستقل
-        audio_direct_url = None
-        formats = info.get('formats', [])
-        for f in formats:
-            if f.get('vcodec') == 'none' and f.get('acodec') != 'none':
-                audio_direct_url = f.get('url')
-                break
-        
-        if not audio_direct_url:
-            audio_direct_url = video_direct_url
+def get_tiktok_media(url):
+    """طريقة مضمونة وتتحمل الضغط لسحب الصوت والفيديو الخالي من التقطيع"""
+    # 1. المحاولة الأولى: TikWM API (رابط الفيديو الأصلي المباشر)
+    try:
+        res = session.post("https://www.tikwm.com/api/", data={"url": url, "hd": 1}, timeout=12)
+        data = res.json()
+        if data.get("code") == 0:
+            d = data["data"]
+            # رابط 'play' يمثل فيديو تيك توك الأصلي الخام وبدون تقطيع فريمات
+            v_url = d.get("play") or d.get("hdplay")
+            if v_url and v_url.startswith("/"):
+                v_url = f"https://www.tikwm.com{v_url}"
+            m_url = d.get("music")
+            if m_url and m_url.startswith("/"):
+                m_url = f"https://www.tikwm.com{m_url}"
+            return v_url, m_url
+    except:
+        pass
 
-        return video_direct_url, audio_direct_url
+    # 2. المحاولة الثانية: TiklyDown
+    try:
+        res = session.get(f"https://api.tiklydown.eu.org/api/download?url={url}", timeout=12)
+        if res.status_code == 200:
+            data = res.json()
+            v_url = data.get("video", {}).get("noWatermark")
+            m_url = data.get("music", {}).get("url")
+            return v_url, m_url
+    except:
+        pass
+
+    return None, None
+
+def download_file_bytes(download_url):
+    if not download_url:
+        return None
+    try:
+        r = session.get(download_url, timeout=25)
+        if r.status_code == 200:
+            return r.content
+    except:
+        pass
+    return None
 
 # الواجهة الرئيسيّة
 st.markdown('<div class="title-text">✨ محمل تيك توك الاحترافي</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle-text">سحب مباشر من سيرفرات تيك توك الرسمية (سلاسة كاملة للمونتاج)</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle-text">سلس، بدون تقطيع فريمات، وبأعلى جودة للمونتاج</div>', unsafe_allow_html=True)
 
 url = st.text_input("ضع رابط فيديو تيك توك هنا:", placeholder="https://vm.tiktok.com/...")
 
 if st.button("استخراج الفيديو والصوت 🚀"):
     if url and "tiktok" in url.lower():
-        with st.spinner("جاري سحب الملف الأصلي مباشرة من تيك توك... ⏳"):
-            try:
-                v_url, a_url = extract_original_tiktok(url)
+        with st.spinner("جاري استخراج الفيديو والصوت بدون تقطيع... ⏳"):
+            v_url, m_url = get_tiktok_media(url)
+            
+            if v_url:
+                v_bytes = download_file_bytes(v_url)
+                m_bytes = download_file_bytes(m_url) if m_url else None
                 
-                # جلب بتات الفيديو الخام
-                v_res = requests.get(v_url, headers=HEADERS, timeout=30)
-                if v_res.status_code == 200:
-                    st.session_state['v_bytes'] = v_res.content
-                    
-                # جلب بتات الصوت
-                a_res = requests.get(a_url, headers=HEADERS, timeout=30)
-                if a_res.status_code == 200:
-                    st.session_state['m_bytes'] = a_res.content
-                    
-                st.session_state['ready'] = True
-            except Exception as e:
-                st.error("تعذر سحب الفيديو الأصلي. تأكد من صحة الرابط أو جرب رابطاً آخر.")
+                if v_bytes:
+                    st.session_state['v_bytes'] = v_bytes
+                    st.session_state['m_bytes'] = m_bytes
+                    st.session_state['ready'] = True
+                else:
+                    st.error("فشل تحميل بتات الفيديو. حاول مرة أخرى.")
+            else:
+                st.error("تعذر العثور على الفيديو. تأكد من أن الحساب ليس خاصاً.")
     else:
         st.warning("الرجاء إدخال رابط تيك توك صحيح! 🔗")
 
 if st.session_state.get('ready'):
-    st.success("تم سحب الملف الأصلي 100% بنجاح وبدون أي تقطيع! 🎉")
+    st.success("تم سحب الملفات بنجاح 100%! 🎉")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if 'v_bytes' in st.session_state:
+        if st.session_state.get('v_bytes'):
             st.download_button(
-                label="تحميل الفيديو الأصلي (MP4) 🎬",
+                label="تحميل الفيديو (MP4) 🎬",
                 data=st.session_state['v_bytes'],
-                file_name="tiktok_original.mp4",
+                file_name="tiktok_smooth_video.mp4",
                 mime="video/mp4",
                 use_container_width=True
             )
             
     with col2:
-        if 'm_bytes' in st.session_state:
+        if st.session_state.get('m_bytes'):
             st.download_button(
                 label="تحميل الصوت (MP3) 🎵",
                 data=st.session_state['m_bytes'],
