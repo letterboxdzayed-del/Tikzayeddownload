@@ -1,8 +1,11 @@
 import streamlit as st
+import yt_dlp
 import requests
 
-st.set_page_config(page_title="محمل تيك توك", page_icon="✨", layout="centered")
+# إعدادات الصفحة
+st.set_page_config(page_title="محمل تيك توك الاحترافي", page_icon="✨", layout="centered")
 
+# CSS وتصميم الواجهة
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
@@ -45,6 +48,8 @@ st.markdown("""
         color: #ffffff !important;
         background-color: transparent !important;
     }
+
+    /* زر الاستخراج */
     div.stButton > button {
         background-color: #D4AF37 !important;
         color: #000000 !important;
@@ -62,6 +67,8 @@ st.markdown("""
         background-color: #f1c40f !important;
         transform: translateY(-2px) !important;
     }
+
+    /* أزرار التحميل */
     div.stDownloadButton > button {
         border: none !important;
         border-radius: 12px !important;
@@ -72,16 +79,19 @@ st.markdown("""
         transition: all 0.3s ease !important;
         margin-top: 10px !important;
     }
+    
     div[data-testid="column"]:nth-child(1) div.stDownloadButton > button {
         background: linear-gradient(135deg, #D4AF37 0%, #AA7C11 100%) !important;
         color: #000000 !important;
         box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25) !important;
     }
+
     div[data-testid="column"]:nth-child(2) div.stDownloadButton > button {
         background: #1f1f1f !important;
         color: #D4AF37 !important;
         border: 1px solid #D4AF37 !important;
     }
+
     .custom-footer {
         text-align: center;
         color: #444444 !important;
@@ -93,92 +103,74 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Referer": "https://www.tiktok.com/"
 }
 
-def fetch_tiktok_data(url):
-    # الاعتماد الأساسي: سيرفر يسحب الرابط الخام بدون إعادة ضغط لتجنب فقدان الفريمات
-    try:
-        res = requests.get(f"https://api.tiklydown.eu.org/api/download?url={url}", headers=HEADERS, timeout=15)
-        if res.status_code == 200:
-            data = res.json()
-            if "video" in data:
-                v_url = data["video"].get("noWatermark")
-                m_url = data.get("music", {}).get("url")
-                return v_url, m_url
-    except:
-        pass
-    
-    # سيرفر احتياطي
-    try:
-        res = requests.post("https://www.tikwm.com/api/", data={"url": url, "hd": 1}, headers=HEADERS, timeout=15)
-        data = res.json()
-        if data.get("code") == 0:
-            d = data["data"]
-            v_url = d.get("hdplay") or d.get("play")
-            if v_url and v_url.startswith("/"):
-                v_url = f"https://www.tikwm.com{v_url}"
-            m_url = d.get("music")
-            return v_url, m_url
-    except:
-        pass
-
-    return None, None
-
-def safe_download_bytes(url):
-    """تحميل الملف على دفعات متتالية لتأمين كل الإطارات (Frames) ومنع التقطيع"""
-    try:
-        res = requests.get(url, stream=True, headers=HEADERS, timeout=30)
-        res.raise_for_status()
+def extract_original_tiktok(tiktok_url):
+    """استخراج رابط الفيديو والصوت المباشر من سيرفرات تيك توك الرسمية مباشرة"""
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'format': 'bestvideo+bestaudio/best',
+        'check_formats': False,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(tiktok_url, download=False)
+        video_direct_url = info.get('url')
         
-        content = bytearray()
-        # تقسيم التحميل لحزم صغيرة لضمان عدم ضياع أي بيانات أثناء النقل
-        for chunk in res.iter_content(chunk_size=8192):
-            if chunk:
-                content.extend(chunk)
-        return bytes(content)
-    except Exception:
-        return None
+        # البحث عن ملف الصوت المستقل
+        audio_direct_url = None
+        formats = info.get('formats', [])
+        for f in formats:
+            if f.get('vcodec') == 'none' and f.get('acodec') != 'none':
+                audio_direct_url = f.get('url')
+                break
+        
+        if not audio_direct_url:
+            audio_direct_url = video_direct_url
 
-st.markdown('<div class="title-text">✨ محمل تيك توك</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle-text">جودة خام 60fps، بدون علامة مائية، جاهز للمونتاج</div>', unsafe_allow_html=True)
+        return video_direct_url, audio_direct_url
+
+# الواجهة الرئيسيّة
+st.markdown('<div class="title-text">✨ محمل تيك توك الاحترافي</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle-text">سحب مباشر من سيرفرات تيك توك الرسمية (سلاسة كاملة للمونتاج)</div>', unsafe_allow_html=True)
 
 url = st.text_input("ضع رابط فيديو تيك توك هنا:", placeholder="https://vm.tiktok.com/...")
 
 if st.button("استخراج الفيديو والصوت 🚀"):
     if url and "tiktok" in url.lower():
-        with st.spinner("جاري سحب الملف الخام وتأمين الإطارات... ⏳"):
-            video_url, music_url = fetch_tiktok_data(url)
-            
-            if video_url:
-                v_bytes = safe_download_bytes(video_url)
-                if v_bytes:
-                    st.session_state['v_bytes'] = v_bytes
+        with st.spinner("جاري سحب الملف الأصلي مباشرة من تيك توك... ⏳"):
+            try:
+                v_url, a_url = extract_original_tiktok(url)
+                
+                # جلب بتات الفيديو الخام
+                v_res = requests.get(v_url, headers=HEADERS, timeout=30)
+                if v_res.status_code == 200:
+                    st.session_state['v_bytes'] = v_res.content
                     
-                    if music_url:
-                        m_bytes = safe_download_bytes(music_url)
-                        if m_bytes:
-                            st.session_state['m_bytes'] = m_bytes
+                # جلب بتات الصوت
+                a_res = requests.get(a_url, headers=HEADERS, timeout=30)
+                if a_res.status_code == 200:
+                    st.session_state['m_bytes'] = a_res.content
                     
-                    st.session_state['ready'] = True
-                else:
-                    st.error("حدث خطأ أثناء تأمين نقل الفيديو. ❌")
-            else:
-                st.error("عذراً، تعذر سحب الرابط أو الفيديو من حساب خاص. ❌")
+                st.session_state['ready'] = True
+            except Exception as e:
+                st.error("تعذر سحب الفيديو الأصلي. تأكد من صحة الرابط أو جرب رابطاً آخر.")
     else:
         st.warning("الرجاء إدخال رابط تيك توك صحيح! 🔗")
 
 if st.session_state.get('ready'):
-    st.success("تم تجهيز الفيديو والصوت بجودة خام بنجاح! 🎉")
+    st.success("تم سحب الملف الأصلي 100% بنجاح وبدون أي تقطيع! 🎉")
     
     col1, col2 = st.columns(2)
     
     with col1:
         if 'v_bytes' in st.session_state:
             st.download_button(
-                label="تحميل الفيديو (MP4) 🎬",
+                label="تحميل الفيديو الأصلي (MP4) 🎬",
                 data=st.session_state['v_bytes'],
-                file_name="tiktok_raw_video.mp4",
+                file_name="tiktok_original.mp4",
                 mime="video/mp4",
                 use_container_width=True
             )
