@@ -4,16 +4,23 @@ import requests
 # إعدادات الصفحة الأساسية
 st.set_page_config(page_title="محمل تيك توك | زايد", page_icon="✨", layout="centered")
 
-# حقن كود CSS لتطبيق التصميم الذهبي الملكي والخطوط
+# كود CSS إجباري لكسر إعدادات ستريملت الافتراضية
 st.markdown("""
 <style>
+    /* استدعاء خط تجوال الرسمي من جوجل */
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700&display=swap');
     
-    /* تغيير الخطوط والخلفية */
-    html, body, [class*="css"] {
-        font-family: 'GS Pro', 'Jawal', 'Tajawal', sans-serif !important;
-        background-color: #0a0a0a !important;
-        color: #ffffff !important;
+    /* إجبار الخلفية على اللون الأسود الليلي المخملي */
+    [data-testid="stAppViewContainer"] {
+        background-color: #050505 !important;
+    }
+    [data-testid="stHeader"] {
+        background-color: rgba(0,0,0,0) !important;
+    }
+    
+    /* إجبار جميع النصوص على استخدام تجوال أو GS Pro */
+    html, body, [class*="css"], div, p, span, h1, h2, h3, input, button {
+        font-family: 'GE SS Two', 'GS Pro', 'Tajawal', sans-serif !important;
     }
     
     /* إخفاء القائمة العلوية وعلامة ستريملت المائية */
@@ -21,47 +28,50 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* تصميم العنوان */
+    /* تصميم العنوان الفخم باللون الذهبي الحقيقي */
     .title-text {
-        color: #D4AF37;
+        color: #D4AF37 !important;
         text-align: center;
-        font-size: 35px;
-        font-weight: bold;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        font-size: 40px !important;
+        font-weight: 700 !important;
+        text-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
         margin-bottom: 5px;
     }
     
     .subtitle-text {
-        color: #aaaaaa;
+        color: #888888 !important;
         text-align: center;
-        font-size: 16px;
-        margin-bottom: 30px;
+        font-size: 16px !important;
+        margin-bottom: 40px;
     }
     
     /* تصميم زر التحميل الذهبي */
     .gold-btn {
-        background-color: #D4AF37;
-        color: #0a0a0a !important;
-        padding: 15px 30px;
+        background-color: #D4AF37 !important;
+        color: #000000 !important;
+        padding: 15px 35px;
         border-radius: 10px;
         text-align: center;
         display: block;
-        font-size: 18px;
-        font-weight: bold;
+        font-size: 22px !important;
+        font-weight: bold !important;
         text-decoration: none;
         margin: 20px auto;
         width: fit-content;
+        border: 2px solid #D4AF37;
         box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-        transition: 0.3s;
+        transition: all 0.3s ease-in-out;
     }
     .gold-btn:hover {
-        background-color: #b5952f;
-        box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+        background-color: transparent !important;
+        color: #D4AF37 !important;
+        box-shadow: 0 6px 25px rgba(212, 175, 55, 0.6);
+        transform: scale(1.05);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# دوال سحب الفيديو (نفس المحرك القوي)
+# دوال سحب الفيديو
 def expand_tiktok_url(url: str):
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
         try:
@@ -106,7 +116,6 @@ if st.button("استخراج الفيديو 🚀", use_container_width=True):
             
             if video_url:
                 st.success("تم تجهيز الفيديو بنجاح! 🎉")
-                # زر التحميل الفخم
                 st.markdown(f'<a href="{video_url}" target="_blank" class="gold-btn">تحميل الفيديو الآن 📥</a>', unsafe_allow_html=True)
             else:
                 st.error("عذراً، السيرفر يرفض الرابط أو الحساب خاص. ❌")
